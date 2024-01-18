@@ -1,5 +1,6 @@
 # This configuration file is for the **development** setup.
 # For a production example please refer to getredash/setup repository on GitHub.
+<<<<<<< HEAD:compose.yaml
 x-redash-service: &redash-service
   build:
     context: .
@@ -20,33 +21,44 @@ x-redash-environment: &redash-environment
   REDASH_ENFORCE_CSRF: "true"
   REDASH_GUNICORN_TIMEOUT: 60
   # Set secret keys in the .env file
+=======
+version: "3.8"
+>>>>>>> reuse built frontend in ci, merge compose files:compose.yml
 services:
   server:
-    <<: *redash-service
-    command: dev_server
+    extends:
+      file: compose.base.yml
+      service: .redash
+    command: server
     depends_on:
       - postgres
       - redis
     ports:
-      - "5001:5000"
+      - "5000:5000"
       - "5678:5678"
     environment:
-      <<: *redash-environment
       PYTHONUNBUFFERED: 0
   scheduler:
-    <<: *redash-service
-    command: dev_scheduler
+    extends:
+      file: compose.base.yml
+      service: .redash
+    profiles:
+      - e2e
+      - local
+    command: scheduler
     depends_on:
       - server
-    environment:
-      <<: *redash-environment
   worker:
-    <<: *redash-service
-    command: dev_worker
+    extends:
+      file: compose.base.yml
+      service: .redash
+    profiles:
+      - e2e
+      - local
+    command: worker
     depends_on:
       - server
     environment:
-      <<: *redash-environment
       PYTHONUNBUFFERED: 0
   redis:
     image: redis:7-alpine
@@ -68,3 +80,27 @@ services:
       - "1080:1080"
       - "1025:1025"
     restart: unless-stopped
+  cypress:
+    ipc: host
+    build:
+      context: .
+      dockerfile: Dockerfile.cypress
+    profiles:
+      - e2e
+    depends_on:
+      - server
+      - worker
+      - scheduler
+    environment:
+      CYPRESS_baseUrl: "http://server:5000"
+      PERCY_TOKEN: ${PERCY_TOKEN}
+      PERCY_BRANCH: ${PERCY_BRANCH}
+      PERCY_COMMIT: ${PERCY_COMMIT}
+      PERCY_PULL_REQUEST: ${PERCY_PULL_REQUEST}
+      COMMIT_INFO_BRANCH: ${COMMIT_INFO_BRANCH}
+      COMMIT_INFO_MESSAGE: ${COMMIT_INFO_MESSAGE}
+      COMMIT_INFO_AUTHOR: ${COMMIT_INFO_AUTHOR}
+      COMMIT_INFO_SHA: ${COMMIT_INFO_SHA}
+      COMMIT_INFO_REMOTE: ${COMMIT_INFO_REMOTE}
+      CYPRESS_PROJECT_ID: ${CYPRESS_PROJECT_ID}
+      CYPRESS_RECORD_KEY: ${CYPRESS_RECORD_KEY}
