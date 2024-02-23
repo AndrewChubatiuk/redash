@@ -1,29 +1,3 @@
-# This configuration file is for the **development** setup.
-# For a production example please refer to getredash/setup repository on GitHub.
-<<<<<<< HEAD:compose.yaml
-x-redash-service: &redash-service
-  build:
-    context: .
-    args:
-      skip_frontend_build: "true"  # set to empty string to build
-  volumes:
-    - .:/app
-  env_file:
-    - .env
-x-redash-environment: &redash-environment
-  REDASH_LOG_LEVEL: "INFO"
-  REDASH_REDIS_URL: "redis://redis:6379/0"
-  REDASH_DATABASE_URL: "postgresql://postgres@postgres/postgres"
-  REDASH_RATELIMIT_ENABLED: "false"
-  REDASH_MAIL_DEFAULT_SENDER: "redash@example.com"
-  REDASH_MAIL_SERVER: "email"
-  REDASH_MAIL_PORT: 1025
-  REDASH_ENFORCE_CSRF: "true"
-  REDASH_GUNICORN_TIMEOUT: 60
-  # Set secret keys in the .env file
-=======
-version: "3.8"
->>>>>>> reuse built frontend in ci, merge compose files:compose.yml
 services:
   server:
     extends:
