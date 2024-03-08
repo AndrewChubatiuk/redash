@@ -86,6 +86,11 @@ jobs:
             FRONTEND_BUILD_MODE=1
         env:
           DOCKER_CONTENT_TRUST: true
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
