@@ -9,8 +9,8 @@ on:
       - master
 
 env:
-  DOCKER_REPOSITORY: redash/redash
-  PREVIEW_DOCKER_REPOSITORY: redash/preview
+  DOCKER_REPOSITORY: achubatiuk/redash
+  PREVIEW_DOCKER_REPOSITORY: achubatiuk/preview
 
 jobs:
   build-skip-check:
