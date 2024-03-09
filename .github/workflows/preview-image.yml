@@ -76,6 +76,7 @@ jobs:
           echo "VERSION_TAG=$FULL_VERSION" >> "$GITHUB_OUTPUT"
       - name: Build and push preview image to Docker Hub
         uses: docker/build-push-action@v5
+        id: build
         with:
           push: true
           context: .
