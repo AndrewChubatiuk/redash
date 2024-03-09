@@ -76,14 +76,15 @@ jobs:
           echo "VERSION_TAG=$FULL_VERSION" >> "$GITHUB_OUTPUT"
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+          echo "SCOPE=${platform//\//-}" >> $GITHUB_ENV
       - name: Build and push preview image to Docker Hub
         uses: docker/build-push-action@v5
         id: build
         with:
           push: true
           context: .
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ env.SCOPE }}
+          cache-to: type=gha,mode=max,scope=${{ env.SCOPE }}
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ env.DOCKER_REPOSITORY }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
