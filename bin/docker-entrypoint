@@ -82,8 +82,41 @@ server() {
   esac
 }
 
-create_db() {
-  exec /app/manage.py database create_tables
+migrate() {
+  REDASH_DB_MIGRATE_TIMEOUT=${REDASH_DB_UPGRADE_TIMEOUT:-600}
+  REDASH_DB_MIGRATE_MAX_ATTEMPTS=${REDASH_DB_MIGRATE_MAX_ATTEMPTS:-5}
+  REDASH_DB_MIGRATE_RETRY_WAIT=${REDASH_DB_MIGRATE_RETRY_WAIT:-10}
+  ATTEMPTS=0
+  while ((ATTEMPTS < MAX_ATTEMPTS)); do
+    echo "Starting attempt ${ATTEMPTS} of ${REDASH_DB_MIGRATE_MAX_ATTEMPTS}"
+    ATTEMPTS=$((ATTEMPTS+1))
+    timeout $REDASH_DB_MIGRATE_TIMEOUT /app/manage.py database create_tables
+    timeout $REDASH_DB_MIGRATE_TIMEOUT /app/manage.py db upgrade
+    STATUS=$(timeout $REDASH_DB_MIGRATE_TIMEOUT /app/manage.py status 2>&1)
+    RETCODE=$?
+    echo "Return code: ${RETCODE}"
+    echo "Status: ${STATUS}"
+    case "$RETCODE" in
+      0)
+        exit 0
+        ;;
+      124)
+        echo "Status command timed out after ${REDASH_DB_MIGRATE_TIMEOUT} seconds."
+        ;;
+    esac
+    case "$STATUS" in
+      *sqlalchemy.exc.OperationalError*)
+        echo "Database not yet functional, waiting."
+        ;;
+      *sqlalchemy.exc.ProgrammingError*)
+        echo "Database does not appear to be installed."
+        ;;
+    esac
+    echo "Waiting ${REDASH_DB_MIGRATE_RETRY_WAIT} seconds before retrying."
+    sleep 10
+  done
+  echo "Reached ${REDASH_DB_MIGRATE_MAX_ATTEMPTS} attempts, giving up."
+  exit 1
 }
 
 help() {
@@ -98,7 +131,7 @@ help() {
   echo ""
   echo "shell -- open shell"
   echo "debug -- start Flask development server with remote debugger via ptvsd"
-  echo "create_db -- create database tables"
+  echo "migrate -- create database tables and run migrations"
   echo "manage -- CLI to manage redash"
   echo "tests -- run tests"
 }
@@ -141,8 +174,8 @@ case "$1" in
   shell)
     exec /app/manage.py shell
     ;;
-  create_db)
-    create_db
+  migrate)
+    migrate
     ;;
   manage)
     shift
