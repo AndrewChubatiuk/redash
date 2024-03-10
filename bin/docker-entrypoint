@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+if [ -z $REDASH_CACHE_URL ]; then
+  export REDASH_CACHE_URL=redis://:${REDASH_CACHE_PASSWORD}@${REDASH_CACHE_HOSTNAME}:${REDASH_CACHE_PORT}/${REDASH_CACHE_NAME}
+fi
+
+if [ -z $REDASH_DB_URL ]; then
+  export REDASH_DB_URL=postgresql://${REDASH_DB_USER}:${REDASH_DB_PASSWORD}@${REDASH_DB_HOSTNAME}:${REDASH_DB_PORT}/${REDASH_DB_NAME}
+fi
+
 scheduler() {
   echo "Starting RQ scheduler..."
 
@@ -40,7 +48,7 @@ worker() {
 workers_healthcheck() {
   WORKERS_COUNT=${WORKERS_COUNT}
   echo "Checking active workers count against $WORKERS_COUNT..."
-  ACTIVE_WORKERS_COUNT=`echo $(rq info --url $REDASH_REDIS_URL -R | grep workers | grep -oP ^[0-9]+)`
+  ACTIVE_WORKERS_COUNT=`echo $(rq info --url $REDASH_CACHE_URL -R | grep workers | grep -oP ^[0-9]+)`
   if [ "$ACTIVE_WORKERS_COUNT" -lt "$WORKERS_COUNT"  ]; then
     echo "$ACTIVE_WORKERS_COUNT workers are active, Exiting"
     exit 1
@@ -96,8 +104,6 @@ help() {
 }
 
 tests() {
-  export REDASH_DATABASE_URL="postgresql://postgres@postgres/tests"
-
   if [ $# -eq 0 ]; then
     TEST_ARGS=tests/
   else
