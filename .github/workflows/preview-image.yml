@@ -12,7 +12,7 @@ env:
 jobs:
   build-skip-check:
     runs-on: ubuntu-22.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' && (startsWith(github.event.workflow_run.head_branch, 'refs/tags/') || startsWith(github.event.workflow_run.head_branch, 'refs/heads/master')) }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && (endsWith(github.event.workflow_run.head_branch, '-dev') || github.event.workflow_run.head_branch == 'master') }}
     outputs:
       skip: ${{ steps.skip-check.outputs.skip }}
     steps:
@@ -70,7 +70,7 @@ jobs:
           set -x
           BRANCH=${{ github.event.workflow_run.head_branch }}
           VERSION=$(jq -r .version package.json) 
-          if [[ "$BRANCH" =~ ^refs/tags/.* ]]; then
+          if [[ "$BRANCH" =~ ^[0-9]+\.[0-9]+\.[0-9]+\-dev ]]; then
             FULL_VERSION=${VERSION}
           else
             FULL_VERSION=${VERSION}-b${GITHUB_RUN_ID}.${GITHUB_RUN_NUMBER}
