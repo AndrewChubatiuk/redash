@@ -10,6 +10,7 @@ on:
       - master
 env:
   CYPRESS_COVERAGE: "true"
+  CYPRESS_CACHE_FOLDER: ${{ github.workspace }}/node_modules/.cache/Cypress
   NODE_VERSION: 18
   YARN_VERSION: 1.22.22
   REDASH_COOKIE_SECRET: 2H9gNG9obnAQ9qnR9BDTQUph6CbXKCzF
@@ -60,6 +61,7 @@ jobs:
       - name: Build Docker Images
         run: |
           set -x
+          touch .env
           docker compose build
           docker compose up -d
           sleep 10
@@ -75,7 +77,7 @@ jobs:
           docker cp tests:/app/coverage.xml ./coverage.xml
           docker cp tests:/app/junit.xml /tmp/test-results/unit-tests/results.xml
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Store Test Results
@@ -148,10 +150,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: frontend-lint
     env:
-      CYPRESS_INSTALL_BINARY: 0
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 1
       INSTALL_GROUPS: main
-      COMPOSE_PROFILES: e2e
       PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
       CYPRESS_PROJECT_ID: ${{ secrets.CYPRESS_PROJECT_ID }}
       CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
@@ -175,10 +174,10 @@ jobs:
       - name: Setup Redash Server
         run: |
           set -x
+          touch .env
           yarn build
           yarn cypress build
-          yarn cypress start -- --skip-db-seed
-          docker compose run cypress yarn cypress db-seed
+          yarn cypress start
       - name: Execute Cypress Tests
         run: yarn cypress run-ci
       - name: "Failure: output container logs to console"

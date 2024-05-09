@@ -4,6 +4,8 @@ from click import BOOL, argument, option, prompt
 from flask.cli import AppGroup
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.sql.expression import delete as sql_delete
+from sqlalchemy.sql.expression import select
 
 from redash import models
 from redash.handlers.users import invite_user
@@ -145,13 +147,13 @@ def create_root(email, name, google_auth=False, password=None, organization="def
     print("Creating root user (%s, %s) in organization %s..." % (email, name, organization))
     print("Login with Google Auth: %r\n" % google_auth)
 
-    user = models.User.query.filter(models.User.email == email).first()
+    user = models.db.session.scalar(select(models.User).where(models.User.email == email))
     if user is not None:
         print("User [%s] is already exists." % email)
         exit(1)
 
     org_slug = organization
-    org = models.Organization.query.filter(models.Organization.slug == org_slug).first()
+    org = models.db.session.scalar(select(models.Organization).where(models.Organization.slug == org_slug))
     if org is None:
         org = models.Organization(name=org_slug, slug=org_slug, settings={})
 
@@ -200,13 +202,13 @@ def delete(email, organization=None):
     """
     Delete user EMAIL.
     """
+    deleted_users_query = sql_delete(models.User).where(models.User.email == email)
     if organization:
         org = models.Organization.get_by_slug(organization)
-        deleted_count = models.User.query.filter(models.User.email == email, models.User.org == org.id).delete()
-    else:
-        deleted_count = models.User.query.filter(models.User.email == email).delete(synchronize_session=False)
+        deleted_users_query = deleted_users_query.where(models.User.org == org)
+    result = models.db.session.execute(deleted_users_query.execution_options(synchronize_session=False))
     models.db.session.commit()
-    print("Deleted %d users." % deleted_count)
+    print("Deleted %d users." % result.rowcount)
 
 
 @manager.command()
@@ -224,9 +226,9 @@ def password(email, password, organization=None):
     """
     if organization:
         org = models.Organization.get_by_slug(organization)
-        user = models.User.query.filter(models.User.email == email, models.User.org == org).first()
+        user = models.db.session.scalar(select(models.User).where(models.User.email == email, models.User.org == org))
     else:
-        user = models.User.query.filter(models.User.email == email).first()
+        user = models.db.session.scalar(select(models.User).where(models.User.email == email))
 
     if user is not None:
         user.hash_password(password)
@@ -287,12 +289,13 @@ def invite(email, name, inviter_email, groups, is_admin=False, organization="def
 )
 def list_command(organization=None):
     """List all users"""
+    query_users = select(models.User)
     if organization:
         org = models.Organization.get_by_slug(organization)
-        users = models.User.query.filter(models.User.org == org)
-    else:
-        users = models.User.query
-    for i, user in enumerate(users.order_by(models.User.name)):
+        query_users = query_users.where(models.User.org == org)
+    users = models.db.session.scalars(query_users.order_by(models.User.name)).all()
+
+    for i, user in enumerate(users):
         if i > 0:
             print("-" * 20)
 
@@ -302,6 +305,6 @@ def list_command(organization=None):
             )
         )
 
-        groups = models.Group.query.filter(models.Group.id.in_(user.group_ids)).all()
+        groups = models.db.session.scalars(select(models.Group).where(models.Group.id.in_(user.group_ids))).all()
         group_names = [group.name for group in groups]
         print("Groups: {}".format(", ".join(group_names)))

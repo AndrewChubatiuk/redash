@@ -1,4 +1,5 @@
 client/.tmp/
+client/cypress/
 node_modules/
 viz-lib/node_modules/
 .tmp/
@@ -13,3 +14,7 @@ venv/
 /netlify.toml
 /setup/
 .github/
+compose.*
+*.md
+LICENSE*
+Dockerfile*

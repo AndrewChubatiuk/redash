@@ -25,19 +25,17 @@ class Redash(Flask):
 
 
 def create_app():
+    from redash import authentication, handlers, security, tasks
+    from redash.handlers.webpack import configure_webpack
+    from redash.metrics import request as request_metrics
+    from redash.models import db, users
+    from redash.utils import sentry
+
     from . import (
-        authentication,
-        handlers,
         limiter,
         mail,
         migrate,
-        security,
-        tasks,
     )
-    from .handlers.webpack import configure_webpack
-    from .metrics import request as request_metrics
-    from .models import db, users
-    from .utils import sentry
 
     sentry.init()
     app = Redash()
