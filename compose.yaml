@@ -3,7 +3,7 @@ services:
     extends:
       file: compose.base.yaml
       service: .redash
-    command: server
+    command: server --reload
     depends_on:
       - postgres
       - redis
@@ -32,7 +32,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
   postgres:
-    image: postgres:16-alpine
+    image: pgautoupgrade/pgautoupgrade:latest
     ports:
       - "${POSTGRES_PORT:-15432}:5432"
     # The following turns the DB into less durable, but gains significant performance improvements for the tests run (x3
@@ -48,10 +48,3 @@ services:
       - "1080:1080"
       - "1025:1025"
     restart: unless-stopped
-  cypress:
-    image: node:18-bookworm
-    volumes:
-      - $PWD:/app
-    working_dir: /app
-    environment:
-      CYPRESS_baseUrl: http://server:5000

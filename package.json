@@ -1,6 +1,6 @@
 {
   "name": "redash-client",
-  "version": "24.04.0-dev",
+  "version": "24.05.0-dev",
   "description": "The frontend part of Redash.",
   "main": "index.js",
   "scripts": {
@@ -26,14 +26,14 @@
     "test:watch": "jest --watch",
     "cypress": "node client/cypress/cypress.js",
     "percy": "percy exec -t 300 -- ",
-    "postinstall": "cd viz-lib && yarn install && yarn build:babel"
+    "postinstall": "cd viz-lib && yarn --frozen-lockfile && yarn build:babel"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/getredash/redash.git"
   },
   "engines": {
-    "node": ">16.0 <21.0",
+    "node": ">16.0 <22.0",
     "npm": "please-use-yarn",
     "yarn": "^1.22.10"
   },
