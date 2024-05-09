@@ -2,7 +2,6 @@
 
 export COMPOSE_DOCKER_CLI_BUILD=1
 export DOCKER_BUILDKIT=1
-export COMPOSE_PROFILES=local
 
 define random
 $(shell cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
@@ -32,12 +31,7 @@ create_database: create_db
 
 clean:
 	docker compose down
-	docker compose --project-name cypress down
 	docker compose rm --stop --force
-	docker compose --project-name cypress rm --stop --force
-	docker image rm --force \
-		cypress-server:latest cypress-worker:latest cypress-scheduler:latest \
-		redash-server:latest redash-worker:latest redash-scheduler:latest
 	docker container prune --force
 	docker image prune --force
 	docker volume prune --force
