@@ -1,21 +1,28 @@
 import logging
 import time
 
+from prometheus_client import Counter
 from rq.timeouts import JobTimeoutException
+from sqlalchemy.sql.expression import delete
 
-from redash import models, redis_connection, settings, statsd_client
+from redash import models, redis_connection, settings
 from redash.models.parameterized_query import (
     InvalidParameterError,
     QueryDetachedFromDataSourceError,
 )
 from redash.monitor import rq_job_ids
 from redash.tasks.failure_report import track_failure
+from redash.tasks.queries.execution import enqueue_query
 from redash.utils import json_dumps, sentry
 from redash.worker import get_job_logger, job
 
-from .execution import enqueue_query
-
 logger = get_job_logger(__name__)
+
+refreshSchemaCounter = Counter(
+    "refresh_schema",
+    "Refresh schema operation status counter",
+    ["status"],
+)
 
 
 def empty_schedules():
@@ -131,10 +138,12 @@ def cleanup_query_results():
         settings.QUERY_RESULTS_CLEANUP_MAX_AGE,
     )
 
-    unused_query_results = models.QueryResult.unused(settings.QUERY_RESULTS_CLEANUP_MAX_AGE)
-    deleted_count = models.QueryResult.query.filter(
-        models.QueryResult.id.in_(unused_query_results.limit(settings.QUERY_RESULTS_CLEANUP_COUNT).subquery())
-    ).delete(synchronize_session=False)
+    unused_query_results = models.QueryResult.unused(days=settings.QUERY_RESULTS_CLEANUP_MAX_AGE)
+    deleted_count = models.db.session.execute(
+        delete(models.QueryResult)
+        .where(models.QueryResult.id.in_(unused_query_results.limit(settings.QUERY_RESULTS_CLEANUP_COUNT).subquery()))
+        .execution_options(synchronize_session=False)
+    ).rowcount
     models.db.session.commit()
     logger.info("Deleted %d unused query results.", deleted_count)
 
@@ -169,17 +178,17 @@ def refresh_schema(data_source_id):
             ds.id,
             time.time() - start_time,
         )
-        statsd_client.incr("refresh_schema.success")
+        refreshSchemaCounter.labels("success").inc()
     except JobTimeoutException:
         logger.info(
             "task=refresh_schema state=timeout ds_id=%s runtime=%.2f",
             ds.id,
             time.time() - start_time,
         )
-        statsd_client.incr("refresh_schema.timeout")
+        refreshSchemaCounter.labels("timeout").inc()
     except Exception:
         logger.warning("Failed refreshing schema for the data source: %s", ds.name, exc_info=1)
-        statsd_client.incr("refresh_schema.error")
+        refreshSchemaCounter.labels("error").inc()
         logger.info(
             "task=refresh_schema state=failed ds_id=%s runtime=%.2f",
             ds.id,

@@ -22,7 +22,7 @@ describe("Edit Profile", () => {
     cy.login("jian.yang@redash.io").its("status").should("eq", 200);
     cy.visit("/users/me");
     cy.contains("Jian Yang");
-    fillProfileDataAndSave("Example Admin", "admin@redash.io");
+    fillProfileDataAndSave("Example Admin", Cypress.env("CYPRESS_LOGIN_EMAIL"));
   });
 
   it("regenerates API Key", () => {
@@ -47,13 +47,14 @@ describe("Edit Profile", () => {
     });
 
     it("updates user password when password is correct", () => {
-      fillChangePasswordAndSave("password", "newpassword", "newpassword");
+      const password = Cypress.env("CYPRESS_LOGIN_PASSWORD") || "password";
+      fillChangePasswordAndSave(password, "newpassword", "newpassword");
       cy.contains("Saved.");
       cy.logout();
       cy.login(undefined, "newpassword").its("status").should("eq", 200);
       cy.visit("/users/me");
       cy.getByTestId("ChangePassword").click();
-      fillChangePasswordAndSave("newpassword", "password", "password");
+      fillChangePasswordAndSave("newpassword", password, password);
       cy.contains("Saved.");
     });
 

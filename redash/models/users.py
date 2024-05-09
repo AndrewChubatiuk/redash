@@ -8,16 +8,17 @@ from operator import or_
 from flask import current_app, request_started, url_for
 from flask_login import AnonymousUserMixin, UserMixin, current_user
 from passlib.apps import custom_app_context as pwd_context
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.sql.expression import delete, select
 from sqlalchemy_utils import EmailType
 from sqlalchemy_utils.models import generic_repr
 
 from redash import redis_connection
+from redash.models.base import Column, GFKBase, db, key_type, primary_key
+from redash.models.mixins import BelongsToOrgMixin, TimestampMixin
+from redash.models.types import MutableDict, MutableList, json_cast_property
 from redash.utils import dt_from_timestamp, generate_token
-
-from .base import Column, GFKBase, db, key_type, primary_key
-from .mixins import BelongsToOrgMixin, TimestampMixin
-from .types import MutableDict, MutableList, json_cast_property
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def sync_last_active_at():
     for user_id in user_ids:
         timestamp = redis_connection.hget(LAST_ACTIVE_KEY, user_id)
         active_at = dt_from_timestamp(timestamp)
-        user = User.query.filter(User.id == user_id).first()
+        user = db.session.scalar(select(User).where(User.id == user_id))
         if user:
             user.active_at = active_at
         redis_connection.hdel(LAST_ACTIVE_KEY, user_id)
@@ -78,10 +79,27 @@ class PermissionsCheckMixin:
 class User(TimestampMixin, db.Model, BelongsToOrgMixin, UserMixin, PermissionsCheckMixin):
     id = primary_key("User")
     org_id = Column(key_type("Organization"), db.ForeignKey("organizations.id"))
-    org = db.relationship("Organization", backref=db.backref("users", lazy="dynamic"))
+    org = db.relationship("Organization", back_populates="users", uselist=False)
     name = Column(db.String(320))
     email = Column(EmailType)
     password_hash = Column(db.String(128), nullable=True)
+    events = db.relationship("Event", back_populates="user", lazy="noload")
+    notification_destinations = db.relationship("NotificationDestination", back_populates="user", lazy="noload")
+    query_snippets = db.relationship("QuerySnippet", back_populates="user", lazy="noload")
+    favorites = db.relationship("Favorite", back_populates="user", lazy="noload")
+    alerts = db.relationship("Alert", back_populates="user", lazy="noload")
+    dashboards = db.relationship("Dashboard", back_populates="user", lazy="noload")
+    alert_subscriptions = db.relationship("AlertSubscription", back_populates="user", lazy="noload")
+    changes = db.relationship("Change", back_populates="user", lazy="noload")
+    modified_queries = db.relationship(
+        "Query", back_populates="last_modified_by", foreign_keys="[Query.last_modified_by_id]", lazy="noload"
+    )
+    grantor = db.relationship(
+        "AccessPermission", back_populates="grantor", foreign_keys="[AccessPermission.grantor_id]", lazy="noload"
+    )
+    grantee = db.relationship(
+        "AccessPermission", back_populates="grantee", foreign_keys="[AccessPermission.grantee_id]", lazy="noload"
+    )
     group_ids = Column(
         "groups",
         MutableList.as_mutable(ARRAY(key_type("Group"))),
@@ -172,49 +190,51 @@ class User(TimestampMixin, db.Model, BelongsToOrgMixin, UserMixin, PermissionsCh
     @property
     def permissions(self):
         # TODO: this should be cached.
-        return list(itertools.chain(*[g.permissions for g in Group.query.filter(Group.id.in_(self.group_ids))]))
+        groups = db.session.scalars(select(Group).where(Group.id.in_(self.group_ids))).all()
+        return list(itertools.chain(*[g.permissions for g in groups]))
 
     @classmethod
-    def get_by_org(cls, org):
-        return cls.query.filter(cls.org == org)
+    def get_by_org(cls, org, columns=None):
+        if columns is None:
+            columns = [cls]
+        return select(*columns).where(cls.org == org)
 
     @classmethod
     def get_by_id(cls, _id):
-        return cls.query.filter(cls.id == _id).one()
+        return db.session.scalars(select(cls).where(cls.id == _id)).one()
 
     @classmethod
     def get_by_email_and_org(cls, email, org):
-        return cls.get_by_org(org).filter(cls.email == email).one()
+        return db.session.scalars(cls.get_by_org(org).where(cls.email == email)).one()
 
     @classmethod
     def get_by_api_key_and_org(cls, api_key, org):
-        return cls.get_by_org(org).filter(cls.api_key == api_key).one()
+        return db.session.scalars(cls.get_by_org(org).where(cls.api_key == api_key)).one()
 
     @classmethod
-    def all(cls, org):
-        return cls.get_by_org(org).filter(cls.disabled_at.is_(None))
+    def all(cls, org, columns=None):
+        return cls.get_by_org(org, columns).where(cls.disabled_at.is_(None))
 
     @classmethod
     def all_disabled(cls, org):
-        return cls.get_by_org(org).filter(cls.disabled_at.isnot(None))
+        return cls.get_by_org(org).where(cls.disabled_at.isnot(None))
 
     @classmethod
     def search(cls, base_query, term):
         term = "%{}%".format(term)
         search_filter = or_(cls.name.ilike(term), cls.email.like(term))
-
-        return base_query.filter(search_filter)
+        return base_query.where(search_filter)
 
     @classmethod
     def pending(cls, base_query, pending):
         if pending:
-            return base_query.filter(cls.is_invitation_pending.is_(True))
+            return base_query.where(cls.is_invitation_pending.is_(True))
         else:
-            return base_query.filter(cls.is_invitation_pending.isnot(True))  # check for both `false`/`null`
+            return base_query.where(cls.is_invitation_pending.isnot(True))
 
     @classmethod
     def find_by_email(cls, email):
-        return cls.query.filter(cls.email == email)
+        return db.session.scalars(select(cls).where(cls.email == email)).all()
 
     def hash_password(self, password):
         self.password_hash = pwd_context.hash(password)
@@ -223,7 +243,7 @@ class User(TimestampMixin, db.Model, BelongsToOrgMixin, UserMixin, PermissionsCh
         return self.password_hash and pwd_context.verify(password, self.password_hash)
 
     def update_group_assignments(self, group_names):
-        groups = Group.find_by_name(self.org, group_names)
+        groups = db.session.scalars(Group.find_by_name(self.org, group_names)).all()
         groups.append(self.org.default_group)
         self.group_ids = [g.id for g in groups]
         db.session.add(self)
@@ -264,7 +284,7 @@ class Group(db.Model, BelongsToOrgMixin):
     id = primary_key("Group")
     data_sources = db.relationship("DataSourceGroup", back_populates="group", cascade="all")
     org_id = Column(key_type("Organization"), db.ForeignKey("organizations.id"))
-    org = db.relationship("Organization", back_populates="groups")
+    org = db.relationship("Organization", back_populates="groups", uselist=False)
     type = Column(db.String(255), default=REGULAR_GROUP)
     name = Column(db.String(100))
     permissions = Column(ARRAY(db.String(255)), default=DEFAULT_PERMISSIONS)
@@ -286,16 +306,15 @@ class Group(db.Model, BelongsToOrgMixin):
 
     @classmethod
     def all(cls, org):
-        return cls.query.filter(cls.org == org)
+        return select(cls).where(cls.org == org)
 
     @classmethod
     def members(cls, group_id):
-        return User.query.filter(User.group_ids.any(group_id))
+        return select(User).where(User.group_ids.any(group_id))
 
     @classmethod
     def find_by_name(cls, org, group_names):
-        result = cls.query.filter(cls.org == org, cls.name.in_(group_names))
-        return list(result)
+        return select(cls).where(cls.org == org, cls.name.in_(group_names))
 
 
 @generic_repr("id", "object_type", "object_id", "access_type", "grantor_id", "grantee_id")
@@ -304,20 +323,26 @@ class AccessPermission(GFKBase, db.Model):
     # 'object' defined in GFKBase
     access_type = Column(db.String(255))
     grantor_id = Column(key_type("User"), db.ForeignKey("users.id"))
-    grantor = db.relationship(User, backref="grantor", foreign_keys=[grantor_id])
+    grantor = db.relationship(
+        "User", back_populates="grantor", foreign_keys="[AccessPermission.grantor_id]", uselist=False
+    )
     grantee_id = Column(key_type("User"), db.ForeignKey("users.id"))
-    grantee = db.relationship(User, backref="grantee", foreign_keys=[grantee_id])
+    grantee = db.relationship(
+        "User", back_populates="grantee", foreign_keys="[AccessPermission.grantee_id]", uselist=False
+    )
 
     __tablename__ = "access_permissions"
 
     @classmethod
     def grant(cls, obj, access_type, grantee, grantor):
-        grant = cls.query.filter(
-            cls.object_type == obj.__tablename__,
-            cls.object_id == obj.id,
-            cls.access_type == access_type,
-            cls.grantee == grantee,
-            cls.grantor == grantor,
+        grant = db.session.scalars(
+            select(cls).where(
+                cls.object_type == obj.__tablename__,
+                cls.object_id == obj.id,
+                cls.access_type == access_type,
+                cls.grantee == grantee,
+                cls.grantor == grantor,
+            )
         ).one_or_none()
 
         if not grant:
@@ -334,8 +359,9 @@ class AccessPermission(GFKBase, db.Model):
 
     @classmethod
     def revoke(cls, obj, grantee, access_type=None):
-        permissions = cls._query(obj, access_type, grantee)
-        return permissions.delete()
+        conditions = AccessPermission._query_condition(obj, access_type, grantee, None)
+        q = delete(cls).where(*conditions)
+        return db.session.execute(q).rowcount
 
     @classmethod
     def find(cls, obj, access_type=None, grantee=None, grantor=None):
@@ -343,22 +369,25 @@ class AccessPermission(GFKBase, db.Model):
 
     @classmethod
     def exists(cls, obj, access_type, grantee):
-        return cls.find(obj, access_type, grantee).count() > 0
+        conditions = AccessPermission._query_condition(obj, access_type, grantee, None)
+        return db.session.scalar(select(func.count(cls.id)).where(*conditions)) > 0
+
+    @classmethod
+    def _query_condition(cls, obj, access_type=None, grantee=None, grantor=None):
+        conditions = [cls.object_id == obj.id, cls.object_type == obj.__tablename__]
+        if access_type:
+            conditions.append(AccessPermission.access_type == access_type)
+        if grantee:
+            conditions.append(AccessPermission.grantee == grantee)
+        if grantor:
+            conditions.append(AccessPermission.grantor == grantor)
+        return conditions
 
     @classmethod
     def _query(cls, obj, access_type=None, grantee=None, grantor=None):
-        q = cls.query.filter(cls.object_id == obj.id, cls.object_type == obj.__tablename__)
-
-        if access_type:
-            q = q.filter(AccessPermission.access_type == access_type)
-
-        if grantee:
-            q = q.filter(AccessPermission.grantee == grantee)
-
-        if grantor:
-            q = q.filter(AccessPermission.grantor == grantor)
-
-        return q
+        conditions = AccessPermission._query_condition(obj, access_type, grantee, grantor)
+        q = select(cls).where(*conditions)
+        return db.session.scalars(q).all()
 
     def to_dict(self):
         d = {

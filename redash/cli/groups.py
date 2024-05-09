@@ -3,6 +3,7 @@ from sys import exit
 from click import argument, option
 from flask.cli import AppGroup
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.sql.expression import select
 
 from redash import models
 
@@ -58,7 +59,7 @@ def change_permissions(group_id, permissions=None):
     print("Change permissions of group %s ..." % group_id)
 
     try:
-        group = models.Group.query.get(group_id)
+        group = models.db.session.get(models.Group, group_id)
     except NoResultFound:
         print("Group [%s] not found." % group_id)
         exit(1)
@@ -94,13 +95,13 @@ def extract_permissions_string(permissions):
 )
 def list_command(organization=None):
     """List all groups"""
+    query_groups = select(models.Group)
     if organization:
         org = models.Organization.get_by_slug(organization)
-        groups = models.Group.query.filter(models.Group.org == org)
-    else:
-        groups = models.Group.query
+        query_groups = query_groups.where(models.Group.org == org)
 
-    for i, group in enumerate(groups.order_by(models.Group.name)):
+    groups = models.db.session.scalars(query_groups.order_by(models.Group.name)).all()
+    for i, group in enumerate(groups):
         if i > 0:
             print("-" * 20)
 
@@ -114,7 +115,7 @@ def list_command(organization=None):
             )
         )
 
-        members = models.Group.members(group.id)
+        members = models.db.session.scalars(models.Group.members(group.id)).all()
         user_names = [m.name for m in members]
         if user_names:
             print("Users: {}".format(", ".join(user_names)))

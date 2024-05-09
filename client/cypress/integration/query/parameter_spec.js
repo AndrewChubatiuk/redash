@@ -433,8 +433,7 @@ describe("Parameter", () => {
 
       cy.location("search").should("not.contain", "Redash");
 
-      cy.server();
-      cy.route("POST", "**/api/queries/*/results").as("Results");
+      cy.intercept("POST", "**/api/queries/*/results").as("Results");
 
       apply(cy.get("@Input"));
 
@@ -454,8 +453,7 @@ describe("Parameter", () => {
         },
       };
 
-      cy.server();
-      cy.route("GET", "**/api/data_sources/*/schema").as("Schema");
+      cy.intercept("GET", "**/api/data_sources/*/schema").as("Schema");
 
       cy.createQuery(queryData, false)
         .then(({ id }) => cy.visit(`/queries/${id}/source`))
@@ -527,9 +525,8 @@ describe("Parameter", () => {
       cy.get("body").type("{alt}D"); // hide schema browser
     });
 
-    it("is possible to rearrange parameters", function () {
-      cy.server();
-      cy.route("POST", "**/api/queries/*").as("QuerySave");
+    it("is possible to rearrange parameters", function() {
+      cy.intercept("POST", "**/api/queries/*").as("QuerySave");
 
       dragParam("param1", this.paramWidth, 1);
       cy.wait("@QuerySave");

@@ -3,17 +3,14 @@ from collections import defaultdict
 from contextlib import ExitStack
 from functools import wraps
 
+import requests
 import sqlparse
 from dateutil import parser
+from prometheus_client import Counter
 from rq.timeouts import JobTimeoutException
 from sshtunnel import open_tunnel
 
 from redash import settings, utils
-from redash.utils.requests_session import (
-    UnacceptableAddressException,
-    requests_or_advocate,
-    requests_session,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +117,11 @@ class BaseQueryRunner:
     limit_query = " LIMIT 1000"
     limit_keywords = ["LIMIT", "OFFSET"]
     limit_after_select = False
+    queryRunnerResultsCounter = Counter(
+        "query_runner_results",
+        "Query Runner results counter",
+        ["runner", "name", "status"],
+    )
 
     def __init__(self, configuration):
         self.syntax = "sql"
@@ -379,7 +381,7 @@ class BaseHTTPQueryRunner(BaseQueryRunner):
         error = None
         response = None
         try:
-            response = requests_session.request(http_method, url, auth=auth, **kwargs)
+            response = requests.request(http_method, url, auth=auth, **kwargs)
             # Raise a requests HTTP exception with the appropriate reason
             # for 4xx and 5xx response status codes which is later caught
             # and passed back.
@@ -389,14 +391,11 @@ class BaseHTTPQueryRunner(BaseQueryRunner):
             if response.status_code != 200:
                 error = "{} ({}).".format(self.response_error, response.status_code)
 
-        except requests_or_advocate.HTTPError as exc:
+        except requests.HTTPError as exc:
             logger.exception(exc)
             error = "Failed to execute query. "
             f"Return Code: {response.status_code} Reason: {response.text}"
-        except UnacceptableAddressException as exc:
-            logger.exception(exc)
-            error = "Can't query private addresses."
-        except requests_or_advocate.RequestException as exc:
+        except requests.RequestException as exc:
             # Catch all other requests exceptions and return the error.
             logger.exception(exc)
             error = str(exc)

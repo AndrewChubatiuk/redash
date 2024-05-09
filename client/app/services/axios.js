@@ -6,7 +6,10 @@ import qs from "query-string";
 import { restoreSession } from "@/services/restoreSession";
 
 export const axios = axiosLib.create({
-  paramsSerializer: (params) => qs.stringify(params),
+  paramsSerializer: {
+    encode: (value) => value,
+    serialize: (params) => qs.stringify(params),
+  },
   xsrfCookieName: "csrf_token",
   xsrfHeaderName: "X-CSRF-TOKEN",
 });
