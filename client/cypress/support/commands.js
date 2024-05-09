@@ -18,17 +18,17 @@ Cypress.Commands.add("setup", () => {
   const name = LOGIN_NAME;
   let csrf;
   cy.visit("/setup");
-  cy.location().then(loc => {
+  cy.location().then((loc) => {
     if (loc.pathname === "/setup") {
       cy.getCookie("csrf_token")
-        .then(cookie => {
+        .then((cookie) => {
           if (cookie) {
             csrf = cookie.value;
           } else {
             cy.visit("/setup").then(() => {
               cy.get('input[name="csrf_token"]')
                 .invoke("val")
-                .then(csrf_token => {
+                .then((csrf_token) => {
                   csrf = csrf_token;
                 });
             });
@@ -61,7 +61,7 @@ Cypress.Commands.add("setupDatasource", () => {
   const port = 5432;
   const sslmode = "prefer";
   const user = "postgres";
-  cy.getCookie("csrf_token").then(cookie => {
+  cy.getCookie("csrf_token").then((cookie) => {
     cy.request({
       headers: {
         "X-CSRF-TOKEN": cookie.value,
@@ -89,7 +89,7 @@ Cypress.Commands.add("setupDestination", () => {
     addresses: "test@example.com",
   };
   const type = "email";
-  cy.getCookie("csrf_token").then(cookie => {
+  cy.getCookie("csrf_token").then((cookie) => {
     cy.request({
       headers: {
         "X-CSRF-TOKEN": cookie.value,
@@ -137,7 +137,7 @@ Cypress.Commands.add("login", (email = LOGIN_EMAIL, password = LOGIN_PASSWORD) =
 });
 
 Cypress.Commands.add("logout", () => cy.visit("/logout"));
-Cypress.Commands.add("getByTestId", element => cy.get(`[data-test="${element}"]`));
+Cypress.Commands.add("getByTestId", (element) => cy.get(`[data-test="${element}"]`));
 
 /* Clicks a series of elements. Pass in a newline-seperated string in order to click all elements by their test id,
  or enclose the above string in an object with 'button' as key to click the buttons by name. For example:
