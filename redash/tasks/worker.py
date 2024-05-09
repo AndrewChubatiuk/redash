@@ -3,6 +3,7 @@ import os
 import signal
 import sys
 
+from prometheus_client import Gauge
 from rq import Queue as BaseQueue
 from rq.job import Job as BaseJob
 from rq.job import JobStatus
@@ -13,13 +14,17 @@ from rq.worker import (
     Worker,
 )
 
-from redash import statsd_client
-
 # HerokuWorker does not work in OSX https://github.com/getredash/redash/issues/5413
 if sys.platform == "darwin":
     BaseWorker = Worker
 else:
     BaseWorker = HerokuWorker
+
+rqJobsCounter = Gauge(
+    "rq_jobs",
+    "RQ jobs status count",
+    ["queue", "status"],
+)
 
 
 class CancellableJob(BaseJob):
@@ -41,7 +46,7 @@ class StatsdRecordingQueue(BaseQueue):
 
     def enqueue_job(self, *args, **kwargs):
         job = super().enqueue_job(*args, **kwargs)
-        statsd_client.incr("rq.jobs.created.{}".format(self.name))
+        rqJobsCounter.labels(self.name, "created").inc()
         return job
 
 
@@ -59,16 +64,13 @@ class StatsdRecordingWorker(BaseWorker):
     """
 
     def execute_job(self, job, queue):
-        statsd_client.incr("rq.jobs.running.{}".format(queue.name))
-        statsd_client.incr("rq.jobs.started.{}".format(queue.name))
+        rqJobsCounter.labels(queue.name, "started").inc()
         try:
+            rqJobsCounter.labels(queue.name, "running").inc()
             super().execute_job(job, queue)
         finally:
-            statsd_client.decr("rq.jobs.running.{}".format(queue.name))
-            if job.get_status() == JobStatus.FINISHED:
-                statsd_client.incr("rq.jobs.finished.{}".format(queue.name))
-            else:
-                statsd_client.incr("rq.jobs.failed.{}".format(queue.name))
+            rqJobsCounter.labels(queue.name, "running").dec()
+            rqJobsCounter.labels(queue.name, job.get_status()).inc()
 
 
 class HardLimitingWorker(BaseWorker):
@@ -154,7 +156,7 @@ class HardLimitingWorker(BaseWorker):
         job_status = job.get_status()
         if job_status is None:  # Job completed and its ttl has expired
             return
-        if job_status not in [JobStatus.FINISHED, JobStatus.FAILED]:
+        if job_status not in [JobStatus.FINISHED, JobStatus.FAILED, JobStatus.STOPPED, JobStatus.CANCELED]:
             if not job.ended_at:
                 job.ended_at = utcnow()
 

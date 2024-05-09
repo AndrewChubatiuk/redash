@@ -1,6 +1,7 @@
 from mock import Mock, patch
 from rq import Connection
 from rq.exceptions import NoSuchJobError
+from rq.job import JobStatus
 
 from redash import models, rq_redis_connection
 from redash.query_runner.pg import PostgreSQL
@@ -21,7 +22,7 @@ def fetch_job(*args, **kwargs):
 
     result = Mock()
     result.id = job_id
-    result.is_cancelled = False
+    result.get_status = lambda: JobStatus.STARTED
 
     return result
 
@@ -107,7 +108,7 @@ class TestEnqueueTask(BaseTestCase):
             # "cancel" the previous job
             def cancel_job(*args, **kwargs):
                 job = fetch_job(*args, **kwargs)
-                job.is_cancelled = True
+                job.get_status = lambda: JobStatus.CANCELED
                 return job
 
             my_fetch_job.side_effect = cancel_job
@@ -183,7 +184,7 @@ class QueryExecutorTests(BaseTestCase):
             qr.return_value = (query_result_data, None)
             result_id = execute_query("SELECT 1, 2", self.factory.data_source.id, {})
             self.assertEqual(1, qr.call_count)
-            result = models.QueryResult.query.get(result_id)
+            result = models.db.session.get(models.QueryResult, result_id)
             self.assertEqual(result.data, query_result_data)
 
     def test_success_scheduled(self, _):
@@ -210,7 +211,7 @@ class QueryExecutorTests(BaseTestCase):
             )
             q = models.Query.get_by_id(q.id)
             self.assertEqual(q.schedule_failures, 0)
-            result = models.QueryResult.query.get(result_id)
+            result = models.db.session.get(models.QueryResult, result_id)
             self.assertEqual(q.latest_query_data, result)
 
     def test_failure_scheduled(self, _):

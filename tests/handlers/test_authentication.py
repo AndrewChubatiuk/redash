@@ -4,7 +4,7 @@ import mock
 
 from redash import limiter, settings
 from redash.authentication.account import invite_token
-from redash.models import User
+from redash.models import User, db
 from tests import BaseTestCase
 
 
@@ -17,7 +17,8 @@ class TestResetPassword(BaseTestCase):
 
 
 class TestInvite(BaseTestCase):
-    def test_expired_invite_token(self):
+    @mock.patch("prometheus_client.Histogram.observe")
+    def test_expired_invite_token(self, inc):
         with mock.patch("time.time") as patched_time:
             patched_time.return_value = time.time() - (7 * 24 * 3600) - 10
             token = invite_token(self.factory.user)
@@ -99,7 +100,7 @@ class TestInvitePost(BaseTestCase):
             org=self.factory.org,
         )
         self.assertEqual(response.status_code, 302)
-        user = User.query.get(user.id)
+        user = db.session.get(User, user.id)
         self.assertTrue(user.verify_password(password))
         self.assertFalse(user.is_invitation_pending)
 

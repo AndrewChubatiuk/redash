@@ -22,9 +22,11 @@ _REDIS_URL = os.environ.get("REDASH_REDIS_URL", os.environ.get("REDIS_URL", "red
 REDIS_URL = add_decode_responses_to_redis_url(_REDIS_URL)
 PROXIES_COUNT = int(os.environ.get("REDASH_PROXIES_COUNT", "1"))
 
+STATSD_ENABLED = parse_boolean(os.environ.get("REDASH_STATSD_ENABLED", "false"))
 STATSD_HOST = os.environ.get("REDASH_STATSD_HOST", "127.0.0.1")
 STATSD_PORT = int(os.environ.get("REDASH_STATSD_PORT", "8125"))
 STATSD_PREFIX = os.environ.get("REDASH_STATSD_PREFIX", "redash")
+STATSD_PERIOD = float(os.environ.get("REDASH_STATSD_PERIOD", "30.0"))
 STATSD_USE_TAGS = parse_boolean(os.environ.get("REDASH_STATSD_USE_TAGS", "false"))
 
 # Connection settings for Redash's own database (where we store the queries, results, etc)
@@ -70,9 +72,6 @@ ENFORCE_HTTPS = parse_boolean(os.environ.get("REDASH_ENFORCE_HTTPS", "false"))
 ENFORCE_HTTPS_PERMANENT = parse_boolean(os.environ.get("REDASH_ENFORCE_HTTPS_PERMANENT", "false"))
 # Whether file downloads are enforced or not.
 ENFORCE_FILE_SAVE = parse_boolean(os.environ.get("REDASH_ENFORCE_FILE_SAVE", "true"))
-
-# Whether api calls using the json query runner will block private addresses
-ENFORCE_PRIVATE_ADDRESS_BLOCK = parse_boolean(os.environ.get("REDASH_ENFORCE_PRIVATE_IP_BLOCK", "true"))
 
 # Whether to use secure cookies by default.
 COOKIES_SECURE = parse_boolean(os.environ.get("REDASH_COOKIES_SECURE", str(ENFORCE_HTTPS)))

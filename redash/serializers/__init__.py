@@ -7,7 +7,9 @@ separation of concerns.
 from flask_login import current_user
 from funcy import project
 from rq.job import JobStatus
+from rq.results import Result
 from rq.timeouts import JobTimeoutException
+from sqlalchemy.sql.expression import select
 
 from redash import models
 from redash.models.parameterized_query import ParameterizedQuery
@@ -39,10 +41,10 @@ def public_widget(widget):
             "updated_at": v.updated_at,
             "created_at": v.created_at,
             "query": {
-                "id": v.query_rel.id,
-                "name": v.query_rel.name,
-                "description": v.query_rel.description,
-                "options": v.query_rel.options,
+                "id": v.query.id,
+                "name": v.query.name,
+                "description": v.query.description,
+                "options": v.query.options,
             },
         }
 
@@ -55,11 +57,12 @@ def public_dashboard(dashboard):
         ("name", "layout", "dashboard_filters_enabled", "updated_at", "created_at", "options"),
     )
 
-    widget_list = (
-        models.Widget.query.filter(models.Widget.dashboard_id == dashboard.id)
+    widget_list = models.db.session.scalars(
+        select(models.Widget)
+        .where(models.Widget.dashboard_id == dashboard.id)
         .outerjoin(models.Visualization)
         .outerjoin(models.Query)
-    )
+    ).all()
 
     dashboard_dict["widgets"] = [public_widget(w) for w in widget_list]
     return dashboard_dict
@@ -152,7 +155,7 @@ def serialize_visualization(object, with_query=True):
     }
 
     if with_query:
-        d["query"] = serialize_query(object.query_rel)
+        d["query"] = serialize_query(object.query)
 
     return d
 
@@ -187,7 +190,7 @@ def serialize_alert(alert, full=True):
     }
 
     if full:
-        d["query"] = serialize_query(alert.query_rel)
+        d["query"] = serialize_query(alert.query)
         d["user"] = alert.user.to_dict()
     else:
         d["query_id"] = alert.query_id
@@ -205,7 +208,7 @@ def serialize_dashboard(obj, with_widgets=False, user=None, with_favorite_state=
         for w in obj.widgets:
             if w.visualization_id is None:
                 widgets.append(serialize_widget(w))
-            elif user and has_access(w.visualization.query_rel, user, view_only):
+            elif user and has_access(w.visualization.query, user, view_only):
                 widgets.append(serialize_widget(w))
             else:
                 widget = project(
@@ -271,46 +274,33 @@ class DashboardSerializer(Serializer):
 
 
 def serialize_job(job):
-    # TODO: this is mapping to the old Job class statuses. Need to update the client side and remove this
-    STATUSES = {
-        JobStatus.QUEUED: 1,
-        JobStatus.STARTED: 2,
-        JobStatus.FINISHED: 3,
-        JobStatus.FAILED: 4,
-        JobStatus.CANCELED: 5,
-        JobStatus.DEFERRED: 6,
-        JobStatus.SCHEDULED: 7,
-    }
-
-    job_status = job.get_status()
     if job.is_started:
         updated_at = job.started_at or 0
     else:
         updated_at = 0
 
-    status = STATUSES[job_status]
-    result = query_result_id = None
-
-    if job.is_cancelled:
-        error = "Query cancelled by user."
-        status = 4
-    elif isinstance(job.result, Exception):
-        error = str(job.result)
-        status = 4
-    elif isinstance(job.result, dict) and "error" in job.result:
-        error = job.result["error"]
-        status = 4
-    else:
-        error = ""
-        result = query_result_id = job.result
-
+    status = job.get_status()
+    error = result_id = None
+    job_result = job.latest_result()
+    if job_result:
+        if job_result.type == Result.Type.SUCCESSFUL:
+            result = job_result.return_value
+            if isinstance(result, Exception):
+                error = str(result)
+                status = JobStatus.FAILED
+            elif isinstance(result, dict) and "error" in result:
+                error = result["error"]
+                status = JobStatus.FAILED
+            else:
+                result_id = result
+        else:
+            error = job_result.exc_string
     return {
         "job": {
             "id": job.id,
             "updated_at": updated_at,
             "status": status,
             "error": error,
-            "result": result,
-            "query_result_id": query_result_id,
+            "result_id": result_id,
         }
     }

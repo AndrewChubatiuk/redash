@@ -1,7 +1,7 @@
 try:
     import re
 
-    from databend_sqlalchemy import connector
+    from sqlalchemy import create_engine, text
 
     enabled = True
 except ImportError:
@@ -31,7 +31,7 @@ class Databend(BaseQueryRunner):
                 "username": {"type": "string"},
                 "password": {"type": "string", "default": ""},
                 "database": {"type": "string"},
-                "secure": {"type": "boolean", "default": False},
+                "sslmode": {"type": "string", "title": "SSL Mode", "default": "disable"},
             },
             "order": ["username", "password", "host", "port", "database"],
             "required": ["username", "database"],
@@ -73,12 +73,12 @@ class Databend(BaseQueryRunner):
         username = self.configuration.get("username") or "root"
         password = self.configuration.get("password") or ""
         database = self.configuration.get("database") or "default"
-        secure = self.configuration.get("secure") or False
-        connection = connector.connect(f"databend://{username}:{password}@{host}:{port}/{database}?secure={secure}")
-        cursor = connection.cursor()
+        sslmode = self.configuration.get("sslmode") or "disable"
+        engine = create_engine(f"databend://{username}:{password}@{host}:{port}/{database}?sslmode={sslmode}")
+        connection = engine.connect()
 
         try:
-            cursor.execute(query)
+            cursor = connection.execute(text(query)).cursor
             columns = self.fetch_columns([(i[0], self._define_column_type(i[1])) for i in cursor.description])
             rows = [dict(zip((column["name"] for column in columns), row)) for row in cursor]
 

@@ -43,24 +43,24 @@ def enqueue_query(query, data_source, user_id, is_api_key=False, scheduled_query
             if job_id:
                 logger.info("[%s] Found existing job: %s", query_hash, job_id)
                 job_complete = None
-                job_cancelled = None
 
                 try:
                     job = Job.fetch(job_id)
                     job_exists = True
                     status = job.get_status()
-                    job_complete = status in [JobStatus.FINISHED, JobStatus.FAILED]
-                    job_cancelled = job.is_cancelled
-
+                    job_complete = status in [
+                        JobStatus.FINISHED,
+                        JobStatus.FAILED,
+                        JobStatus.STOPPED,
+                        JobStatus.CANCELED,
+                    ]
                     if job_complete:
                         message = "job found is complete (%s)" % status
-                    elif job_cancelled:
-                        message = "job found has ben cancelled"
                 except NoSuchJobError:
                     message = "job found has expired"
                     job_exists = False
 
-                lock_is_irrelevant = job_complete or job_cancelled or not job_exists
+                lock_is_irrelevant = job_complete or not job_exists
 
                 if lock_is_irrelevant:
                     logger.info("[%s] %s, removing lock", query_hash, message)
@@ -155,7 +155,7 @@ class QueryExecutor:
         self.query_id = metadata.get("query_id")
         self.user = _resolve_user(user_id, is_api_key, metadata.get("query_id"))
         self.query_model = (
-            models.Query.query.get(self.query_id)
+            models.db.session.get(models.Query, self.query_id)
             if self.query_id and self.query_id != "adhoc"
             else None
         )  # fmt: skip
@@ -224,12 +224,10 @@ class QueryExecutor:
                 utcnow(),
             )
 
-            updated_query_ids = models.Query.update_latest_result(query_result)
-
             models.db.session.commit()  # make sure that alert sees the latest query result
             self._log_progress("checking_alerts")
-            for query_id in updated_query_ids:
-                check_alerts_for_query.delay(query_id, self.metadata)
+            for q in query_result.queries:
+                check_alerts_for_query.delay(q.id, self.metadata)
             self._log_progress("finished")
 
             result = query_result.id
@@ -259,7 +257,7 @@ class QueryExecutor:
 
     def _load_data_source(self):
         logger.info("job=execute_query state=load_ds ds_id=%d", self.data_source_id)
-        return models.DataSource.query.get(self.data_source_id)
+        return models.db.session.get(models.DataSource, self.data_source_id)
 
 
 # user_id is added last as a keyword argument for backward compatability -- to support executing previously submitted
