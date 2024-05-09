@@ -1,3 +1,5 @@
+from sqlalchemy import distinct, func
+
 from redash.models import Dashboard, db
 from tests import BaseTestCase
 
@@ -9,9 +11,9 @@ class DashboardTest(BaseTestCase):
         query = self.factory.create_query(data_source=ds)
         # We need a bunch of visualizations and widgets configured
         # to trigger wrong counts via the left outer joins.
-        vis1 = self.factory.create_visualization(query_rel=query)
-        vis2 = self.factory.create_visualization(query_rel=query)
-        vis3 = self.factory.create_visualization(query_rel=query)
+        vis1 = self.factory.create_visualization(query=query)
+        vis2 = self.factory.create_visualization(query=query)
+        vis3 = self.factory.create_visualization(query=query)
         widget1 = self.factory.create_widget(visualization=vis1, dashboard=dashboard)
         widget2 = self.factory.create_widget(visualization=vis2, dashboard=dashboard)
         widget3 = self.factory.create_widget(visualization=vis3, dashboard=dashboard)
@@ -25,7 +27,7 @@ class DashboardTest(BaseTestCase):
         self.create_tagged_dashboard(tags=["tag1", "tag2", "tag3"])
 
         self.assertEqual(
-            list(Dashboard.all_tags(self.factory.org, self.factory.user)),
+            db.session.execute(Dashboard.all_tags(self.factory.org, self.factory.user)).all(),
             [("tag1", 3), ("tag2", 2), ("tag3", 1)],
         )
 
@@ -35,7 +37,7 @@ class TestDashboardsByUser(BaseTestCase):
         d = self.factory.create_dashboard(user=self.factory.user)
         d2 = self.factory.create_dashboard(user=self.factory.create_user())
 
-        dashboards = Dashboard.by_user(self.factory.user)
+        dashboards = db.session.scalars(Dashboard.by_user(self.factory.user)).all()
 
         # not using self.assertIn/NotIn because otherwise this fails :O
         self.assertTrue(d in list(dashboards))
@@ -45,7 +47,7 @@ class TestDashboardsByUser(BaseTestCase):
         d = self.factory.create_dashboard(is_draft=True)
         d2 = self.factory.create_dashboard(is_draft=True, user=self.factory.create_user())
 
-        dashboards = Dashboard.by_user(self.factory.user)
+        dashboards = db.session.scalars(Dashboard.by_user(self.factory.user)).all()
 
         # not using self.assertIn/NotIn because otherwise this fails :O
         self.assertTrue(d in dashboards)
@@ -63,10 +65,10 @@ class TestDashboardsByUser(BaseTestCase):
         qry2 = self.factory.create_query(data_source=ds2, user=usr)
 
         viz1 = self.factory.create_visualization(
-            query_rel=qry1,
+            query=qry1,
         )
         viz2 = self.factory.create_visualization(
-            query_rel=qry2,
+            query=qry2,
         )
 
         def create_dashboard():
@@ -79,6 +81,10 @@ class TestDashboardsByUser(BaseTestCase):
         create_dashboard()
         create_dashboard()
 
-        results = Dashboard.all(self.factory.org, usr.group_ids, usr.id)
+        result = db.session.scalar(
+            Dashboard.all(
+                self.factory.org, usr.group_ids, usr.id, columns=[func.count(distinct(Dashboard.id))], distinct=[]
+            )
+        )
 
-        self.assertEqual(2, results.count(), "The incorrect number of dashboards were returned")
+        self.assertEqual(2, result, "The incorrect number of dashboards were returned")

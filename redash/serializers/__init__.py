@@ -9,6 +9,7 @@ from funcy import project
 from rq.job import JobStatus
 from rq.results import Result
 from rq.timeouts import JobTimeoutException
+from sqlalchemy.sql.expression import select
 
 from redash import models
 from redash.models.parameterized_query import ParameterizedQuery
@@ -40,10 +41,10 @@ def public_widget(widget):
             "updated_at": v.updated_at,
             "created_at": v.created_at,
             "query": {
-                "id": v.query_rel.id,
-                "name": v.query_rel.name,
-                "description": v.query_rel.description,
-                "options": v.query_rel.options,
+                "id": v.query.id,
+                "name": v.query.name,
+                "description": v.query.description,
+                "options": v.query.options,
             },
         }
 
@@ -56,11 +57,12 @@ def public_dashboard(dashboard):
         ("name", "layout", "dashboard_filters_enabled", "updated_at", "created_at", "options"),
     )
 
-    widget_list = (
-        models.Widget.query.filter(models.Widget.dashboard_id == dashboard.id)
+    widget_list = models.db.session.scalars(
+        select(models.Widget)
+        .where(models.Widget.dashboard_id == dashboard.id)
         .outerjoin(models.Visualization)
         .outerjoin(models.Query)
-    )
+    ).all()
 
     dashboard_dict["widgets"] = [public_widget(w) for w in widget_list]
     return dashboard_dict
@@ -153,7 +155,7 @@ def serialize_visualization(object, with_query=True):
     }
 
     if with_query:
-        d["query"] = serialize_query(object.query_rel)
+        d["query"] = serialize_query(object.query)
 
     return d
 
@@ -188,7 +190,7 @@ def serialize_alert(alert, full=True):
     }
 
     if full:
-        d["query"] = serialize_query(alert.query_rel)
+        d["query"] = serialize_query(alert.query)
         d["user"] = alert.user.to_dict()
     else:
         d["query_id"] = alert.query_id
@@ -206,7 +208,7 @@ def serialize_dashboard(obj, with_widgets=False, user=None, with_favorite_state=
         for w in obj.widgets:
             if w.visualization_id is None:
                 widgets.append(serialize_widget(w))
-            elif user and has_access(w.visualization.query_rel, user, view_only):
+            elif user and has_access(w.visualization.query, user, view_only):
                 widgets.append(serialize_widget(w))
             else:
                 widget = project(
