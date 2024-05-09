@@ -5,8 +5,8 @@ Revises: 89bc7873a3e0
 Create Date: 2022-01-31 15:24:16.507888
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 
 from redash.models import db
@@ -28,7 +28,7 @@ def upgrade():
                existing_nullable=True,
                existing_server_default=sa.text("'{}'::jsonb"))
     ### end Alembic commands ###
-    
+
     update_query = """
     update users
     set details = details::jsonb || ('{"profile_image_url": "' || profile_image_url || '"}')::jsonb
