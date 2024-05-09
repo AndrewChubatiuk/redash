@@ -48,9 +48,3 @@ services:
       - "1080:1080"
       - "1025:1025"
     restart: unless-stopped
-  # temporary container, remove after merge
-  cypress:
-    image: node:18-bookworm
-    volumes:
-      - $PWD:/app
-    working_dir: /app

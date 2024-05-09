@@ -9,7 +9,6 @@ function buildServer() {
 function startServer() {
   console.log("Starting the server...");
   execSync("docker compose up -d", { stdio: "inherit" });
-  execSync("docker compose run server create_db", { stdio: "inherit" });
 }
 
 function stopServer() {
@@ -26,12 +25,6 @@ function runCypressCI() {
   if (GITHUB_REPOSITORY === "getredash/redash") {
     process.env.CYPRESS_OPTIONS = "--record";
   }
-
-  // Remove four lines below after it's merged
-  delete process.env.CYPRESS_INSTALL_BINARY;
-  execSync("rm -r node_modules", { stdio: "inherit" });
-  execSync("yarn install", { stdio: "inherit" });
-
   execSync("yarn percy cypress run $CYPRESS_OPTIONS", { stdio: "inherit" });
 }
 

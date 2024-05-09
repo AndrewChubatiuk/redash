@@ -137,7 +137,7 @@ Cypress.Commands.add("login", (email = LOGIN_EMAIL, password = LOGIN_PASSWORD) =
 });
 
 Cypress.Commands.add("logout", () => cy.visit("/logout"));
-Cypress.Commands.add("getByTestId", element => cy.get('[data-test="' + element + '"]'));
+Cypress.Commands.add("getByTestId", element => cy.get(`[data-test="${element}"]`));
 
 /* Clicks a series of elements. Pass in a newline-seperated string in order to click all elements by their test id,
  or enclose the above string in an object with 'button' as key to click the buttons by name. For example:
