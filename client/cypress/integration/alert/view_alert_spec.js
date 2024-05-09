@@ -1,5 +1,5 @@
 describe("View Alert", () => {
-  beforeEach(function() {
+  beforeEach(function () {
     cy.login().then(() => {
       cy.createQuery({ query: "select 1 as col_name" })
         .then(({ id: queryId }) => cy.createAlert(queryId, { column: "col_name" }))
@@ -10,17 +10,15 @@ describe("View Alert", () => {
     });
   });
 
-  it("renders the page and takes a screenshot", function() {
+  it("renders the page and takes a screenshot", function () {
     cy.visit(this.alertUrl);
     cy.getByTestId("Criteria").should("exist");
     cy.percySnapshot("View Alert screen");
   });
 
-  it("allows adding new destinations", function() {
+  it("allows adding new destinations", function () {
     cy.visit(this.alertUrl);
-    cy.getByTestId("AlertDestinations")
-      .contains("Test Email Destination")
-      .should("not.exist");
+    cy.getByTestId("AlertDestinations").contains("Test Email Destination").should("not.exist");
 
     cy.intercept("GET", "**/api/destinations").as("Destinations");
     cy.intercept("GET", "**/api/alerts/*/subscriptions").as("Subscriptions");
@@ -32,9 +30,7 @@ describe("View Alert", () => {
     cy.contains("Test Email Destination").click();
     cy.contains("Save").click();
 
-    cy.getByTestId("AlertDestinations")
-      .contains("Test Email Destination")
-      .should("exist");
+    cy.getByTestId("AlertDestinations").contains("Test Email Destination").should("exist");
   });
 
   describe("Alert Destination permissions", () => {
@@ -62,9 +58,7 @@ describe("View Alert", () => {
             .contains("Test Email Destination")
             .parent()
             .within(() => {
-              cy.get(".remove-button")
-                .as("RemoveButton")
-                .should("exist");
+              cy.get(".remove-button").as("RemoveButton").should("exist");
             });
 
           return cy.logout().then(() => cy.login("user@redash.io", "password"));
@@ -93,9 +87,7 @@ describe("View Alert", () => {
             .contains("Test Email Destination")
             .parent()
             .within(() => {
-              cy.get(".remove-button")
-                .as("RemoveButton")
-                .should("exist");
+              cy.get(".remove-button").as("RemoveButton").should("exist");
             });
 
           return cy.logout().then(() => cy.login()); // as admin
