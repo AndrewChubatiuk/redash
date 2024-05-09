@@ -1,4 +1,6 @@
 from flask import Flask
+from prometheus_client import make_wsgi_app
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from redash import settings
@@ -37,6 +39,7 @@ def create_app():
 
     sentry.init()
     app = Redash()
+    app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {"/metrics": make_wsgi_app()})
 
     security.init_app(app)
     request_metrics.init_app(app)
