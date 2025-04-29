@@ -1,9 +1,9 @@
-import datetime
 import decimal
 import hashlib
 import logging
 import re
 import sqlite3
+from datetime import date, datetime, time, timedelta
 from urllib.parse import parse_qs
 
 from redash import models
@@ -109,9 +109,12 @@ def flatten(value):
         return json_dumps(value)
     elif isinstance(value, decimal.Decimal):
         return float(value)
-    elif isinstance(value, datetime.timedelta):
+    elif isinstance(value, (date, time, datetime, timedelta)):
         return str(value)
     else:
+        if logger.isEnabledFor(logging.DEBUG):
+            if not isinstance(value, (type(None), str, float, int, bool)):
+                logger.debug("flatten() found unhandled type: %s", str(type(value)))
         return value
 
 
