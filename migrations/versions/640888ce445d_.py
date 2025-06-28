@@ -7,11 +7,12 @@ Create Date: 2018-09-21 19:35:58.578796
 """
 
 import json
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.sql import table
-from redash.models import MutableDict
 
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.sql import table
+
+from redash.models import MutableDict
 
 # revision identifiers, used by Alembic.
 revision = "640888ce445d"
