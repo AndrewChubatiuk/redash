@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # This is here just to print a warning for users who use the old Fabric upgrade script.
 
 if __name__ == '__main__':

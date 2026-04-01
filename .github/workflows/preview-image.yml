@@ -69,7 +69,7 @@ jobs:
         run: |
           set -x
           VERSION=$(jq -r .version package.json)
-          BRANCH=${{ event.workflow_run.head_branch }}
+          BRANCH=${{ github.event.workflow_run.head_branch }}
           if [[ "$BRANCH" =~ ^[0-9]+\.[0-9]+\.[0-9]+\-dev ]]; then
             FULL_VERSION=${VERSION}
           else

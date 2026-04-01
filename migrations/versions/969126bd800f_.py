@@ -7,11 +7,11 @@ Create Date: 2018-01-31 15:20:30.396533
 """
 
 import json
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
-from redash.models import Dashboard, Widget, db
-
+from redash.models import db
 
 # revision identifiers, used by Alembic.
 revision = "969126bd800f"

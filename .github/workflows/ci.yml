@@ -61,7 +61,6 @@ jobs:
       - name: Build Docker Images
         run: |
           set -x
-          touch .env
           docker compose build
           docker compose up -d
           sleep 10

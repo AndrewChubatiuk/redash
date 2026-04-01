@@ -43,7 +43,7 @@ describe("View Alert", () => {
       });
     });
 
-    it("hides remove button from non-author", function() {
+    it("hides remove button from non-author", function () {
       cy.intercept("GET", "**/api/alerts/*/subscriptions").as("Subscriptions");
 
       cy.logout()
@@ -72,7 +72,7 @@ describe("View Alert", () => {
         });
     });
 
-    it("shows remove button for non-author admin", function() {
+    it("shows remove button for non-author admin", function () {
       cy.intercept("GET", "**/api/alerts/*/subscriptions").as("Subscriptions");
 
       cy.logout()
