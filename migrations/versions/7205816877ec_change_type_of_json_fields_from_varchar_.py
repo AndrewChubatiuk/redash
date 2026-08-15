@@ -5,10 +5,9 @@ Revises: 7ce5925f832b
 Create Date: 2024-01-03 13:55:18.885021
 
 """
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB, JSON
-
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, JSONB
 
 # revision identifiers, used by Alembic.
 revision = '7205816877ec'
@@ -18,7 +17,7 @@ depends_on = None
 
 
 def upgrade():
-    connection = op.get_bind()
+    op.get_bind()
     op.alter_column('queries', 'options',
         existing_type=sa.Text(),
         type_=JSONB(astext_type=sa.Text()),
@@ -77,7 +76,7 @@ def upgrade():
 
 
 def downgrade():
-    connection = op.get_bind()
+    op.get_bind()
     op.alter_column('queries', 'options',
         existing_type=JSONB(astext_type=sa.Text()),
         type_=sa.Text(),

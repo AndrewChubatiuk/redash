@@ -5,17 +5,16 @@ Revises: e5c7a4e2df4d
 Create Date: 2020-12-14 21:42:48.661684
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.sql import table
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
 
 from redash import settings
-from redash.utils.configuration import ConfigurationContainer
 from redash.models.base import key_type
 from redash.models.types import EncryptedConfiguration
-
+from redash.utils.configuration import ConfigurationContainer
 
 # revision identifiers, used by Alembic.
 revision = 'd7d747033183'
@@ -43,7 +42,7 @@ def upgrade():
             ),
         ),
         sa.Column(
-            "options", 
+            "options",
             ConfigurationContainer.as_mutable(
                 EncryptedConfiguration(
                     sa.Text, settings.DATASOURCE_SECRET_KEY, FernetEngine

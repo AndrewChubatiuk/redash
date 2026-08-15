@@ -5,12 +5,9 @@ Revises: e7004224f284
 Create Date: 2018-05-10 15:41:28.053237
 
 """
-import re
-from funcy import flatten, compact
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import ARRAY
-from redash import models
 
 # revision identifiers, used by Alembic.
 revision = "a92d92aa678e"

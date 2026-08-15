@@ -12,7 +12,6 @@ module.exports = defineConfig({
     supportFile: "client/cypress/support/index.js",
     chromeWebSecurity: false,
     video: true,
-    videoUploadOnPasses: false,
     videosFolder: "client/cypress/videos",
     viewportHeight: 1024,
     viewportWidth: 1280,

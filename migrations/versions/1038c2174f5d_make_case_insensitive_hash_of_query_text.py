@@ -5,8 +5,8 @@ Revises: fd4fc850d7ea
 Create Date: 2023-07-16 23:10:12.885949
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.sql import table
 
 from redash.utils import gen_query_hash
